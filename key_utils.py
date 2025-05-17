@@ -7,11 +7,15 @@ import hashlib
 import urllib.parse
 import json
 import logging
+import argparse
+import os
 from typing import Tuple, Dict, Any, Optional
+from pathlib import Path
+from dotenv import load_dotenv
 import requests
 
 # Настройка логирования
-logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+logging.basicConfig(format='%(levelname)s: %(message)s', level=logging.INFO)
 logger = logging.getLogger("key_utils")
 
 def _make_bybit_request(api_key: str, api_secret: str, endpoint: str, params: Dict[str, Any], 
@@ -215,27 +219,73 @@ def get_available_networks(api_key: str, api_secret: str) -> Dict[str, bool]:
     
     return networks
 
-if __name__ == "__main__":
-    # Пример использования
-    import sys
+def load_keys_from_env(env_path: str = ".env") -> Tuple[str, str]:
+    """
+    Загружает API ключи из .env файла
     
-    if len(sys.argv) != 3:
-        print("Использование: python key_utils.py <api_key> <api_secret>")
-        sys.exit(1)
+    Args:
+        env_path: Путь к .env файлу
+        
+    Returns:
+        Tuple[str, str]: (api_key, api_secret)
+    """
+    # Проверка существования файла
+    env_file = Path(env_path)
+    if not env_file.exists():
+        logger.error(f"Файл {env_path} не найден")
+        return "", ""
     
-    api_key = sys.argv[1]
-    api_secret = sys.argv[2]
+    # Загрузка переменных из файла
+    load_dotenv(env_path)
+    
+    # Получение ключей
+    api_key = os.getenv("BYBIT_API_KEY", "")
+    api_secret = os.getenv("BYBIT_API_SECRET", "")
+    
+    if not api_key or not api_secret:
+        logger.warning(f"API ключи не найдены в файле {env_path}")
+    
+    return api_key, api_secret
+
+def run_validation(env_path: str = ".env", verbose: bool = False, 
+                   api_key: str = "", api_secret: str = "") -> bool:
+    """
+    Запускает проверку API ключей и выводит результаты
+    
+    Args:
+        env_path: Путь к .env файлу (если api_key и api_secret не указаны)
+        verbose: Включить подробный вывод
+        api_key: API ключ Bybit (если указан, env_path игнорируется)
+        api_secret: API секрет Bybit (если указан, env_path игнорируется)
+        
+    Returns:
+        bool: True если ключи валидны, False в противном случае
+    """
+    # Настройка уровня логирования
+    if verbose:
+        logger.setLevel(logging.DEBUG)
+        for handler in logger.handlers:
+            handler.setLevel(logging.DEBUG)
+    
+    # Получаем ключи
+    if not api_key or not api_secret:
+        api_key, api_secret = load_keys_from_env(env_path)
+    
+    # Если ключи все еще не указаны, выходим
+    if not api_key or not api_secret:
+        logger.error("API ключи не указаны")
+        return False
     
     # Проверка ключей в обеих сетях
     print("=== Проверка ключей ===")
     
     # Проверка в основной сети
-    valid, message = validate_key(api_key, api_secret, testnet=False)
-    print(f"Основная сеть: {'✅ Валидно' if valid else '❌ Невалидно'} - {message}")
+    valid_mainnet, message_mainnet = validate_key(api_key, api_secret, testnet=False)
+    print(f"Основная сеть: {'✅ Валидно' if valid_mainnet else '❌ Невалидно'} - {message_mainnet}")
     
     # Проверка в тестовой сети
-    valid, message = validate_key(api_key, api_secret, testnet=True)
-    print(f"Тестовая сеть: {'✅ Валидно' if valid else '❌ Невалидно'} - {message}")
+    valid_testnet, message_testnet = validate_key(api_key, api_secret, testnet=True)
+    print(f"Тестовая сеть: {'✅ Валидно' if valid_testnet else '❌ Невалидно'} - {message_testnet}")
     
     # Если ключи валидны хотя бы в одной из сетей, проверяем разрешения
     networks = get_available_networks(api_key, api_secret)
@@ -274,4 +324,33 @@ if __name__ == "__main__":
         print("Рекомендации:")
         print("1. Проверьте правильность ключей")
         print("2. Убедитесь, что ключи активны в панели управления Bybit")
-        print("3. Создайте новые ключи API с необходимыми разрешениями") 
+        print("3. Создайте новые ключи API с необходимыми разрешениями")
+    
+    return valid_mainnet or valid_testnet
+
+if __name__ == "__main__":
+    # Парсинг аргументов командной строки
+    parser = argparse.ArgumentParser(description="Утилита для проверки API ключей Bybit")
+    parser.add_argument('--env', default='.env', help='Путь к .env файлу с API ключами')
+    parser.add_argument('--verbose', action='store_true', help='Включить подробный вывод')
+    parser.add_argument('--key', help='API ключ Bybit (если указан, --env игнорируется)')
+    parser.add_argument('--secret', help='API секрет Bybit (если указан, --env игнорируется)')
+    parser.add_argument('--testnet', action='store_true', help='Проверять только в тестовой сети')
+    parser.add_argument('--mainnet', action='store_true', help='Проверять только в основной сети')
+    args = parser.parse_args()
+    
+    # Если указаны позиционные аргументы, используем их как ключи
+    api_key = args.key or ""
+    api_secret = args.secret or ""
+    
+    # Запускаем проверку
+    success = run_validation(
+        env_path=args.env,
+        verbose=args.verbose,
+        api_key=api_key,
+        api_secret=api_secret
+    )
+    
+    # Выход с соответствующим кодом
+    import sys
+    sys.exit(0 if success else 1) 

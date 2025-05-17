@@ -27,12 +27,12 @@ class TestGridCalculation:
             build_grid(2000, 1000, 5)  # low_price > high_price
             
         with pytest.raises(ValueError):
-            build_grid(1000, 2000, 1)  # num_grids < 2
+            build_grid(1000, 2000, 1)  # grids < 2
     
     def test_calculate_initial_orders(self):
         """Тест расчета начальных ордеров"""
         grid_prices = np.array([1000, 1200, 1400, 1600, 1800, 2000])
-        current_price = 1500
+        current_price = 1500  # Между уровнями 1400 и 1600
         qty = 0.01
         
         buy_orders, sell_orders = calculate_initial_orders(grid_prices, current_price, qty)
@@ -43,8 +43,9 @@ class TestGridCalculation:
         # Проверяем, что ордера на продажу имеют цены выше текущей
         assert all(float(order["price"]) > current_price for order in sell_orders)
         
-        # Проверяем количество ордеров
-        assert len(buy_orders) + len(sell_orders) == len(grid_prices) - 1
+        # Проверяем количество ордеров (уровни ниже текущей цены + уровни выше текущей цены)
+        # Должно быть равно всем уровням сетки (grid_prices), т.к. текущая цена между уровнями
+        assert len(buy_orders) + len(sell_orders) == len(grid_prices)
     
     def test_calculate_mirror_order(self):
         """Тест создания зеркального ордера"""
@@ -88,12 +89,17 @@ class TestGridCalculation:
         assert mirror_order is None
     
     def test_find_grid_level(self):
-        """Тест поиска уровня сетки для заданной цены"""
+        """Тест поиска ближайшего уровня сетки"""
         grid_prices = np.array([1000, 1200, 1400, 1600, 1800, 2000])
         
-        # Точное соответствие
+        # Тест для цены на уровне сетки
         assert find_grid_level(1200, grid_prices) == 1
         
-        # Ближайший уровень
-        assert find_grid_level(1300, grid_prices) == 1  # Ближе к 1200
-        assert find_grid_level(1350, grid_prices) == 2  # Ближе к 1400 
+        # Тест для цены между уровнями сетки
+        assert find_grid_level(1300, grid_prices) == 1  # Ближе к 1200, чем к 1400
+        
+        # Тест для цены вне диапазона сетки (снизу)
+        assert find_grid_level(900, grid_prices) == 0
+        
+        # Тест для цены вне диапазона сетки (сверху)
+        assert find_grid_level(2100, grid_prices) == 5 

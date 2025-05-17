@@ -66,6 +66,10 @@ def calculate_initial_orders(grid_prices: np.ndarray, mid_price: float, qty: flo
     sell_orders = []
     
     for price in grid_prices:
+        # Пропускаем уровень, если он точно равен mid_price
+        if price == mid_price:
+            continue
+            
         order = {
             "price": str(price),
             "qty": str(qty),
@@ -78,7 +82,6 @@ def calculate_initial_orders(grid_prices: np.ndarray, mid_price: float, qty: flo
         elif price > mid_price:
             order["side"] = "Sell"
             sell_orders.append(order)
-        # Если цена равна mid_price, не создаём ордер на этом уровне
     
     logger.info(f"Рассчитаны начальные ордера: {len(buy_orders)} Buy, {len(sell_orders)} Sell")
     return buy_orders, sell_orders
@@ -117,6 +120,16 @@ def calculate_mirror_order(filled_order: Dict[str, Any], grid_prices: np.ndarray
         # Проверяем, что индекс в пределах массива
         if idx_new < 0 or idx_new >= len(grid_prices):
             logger.warning(f"Невозможно создать зеркальный ордер: выход за границы сетки")
+            return None
+            
+        # Если ордер на границе сетки, не создаем зеркальный ордер
+        if (side == "Buy" and idx == len(grid_prices) - 2) or (side == "Sell" and idx == 1):
+            logger.warning(f"Невозможно создать зеркальный ордер: ордер на границе сетки")
+            return None
+            
+        # Если ордер на верхней или нижней границе, не создаем зеркальный ордер
+        if idx == 0 or idx == len(grid_prices) - 1:
+            logger.warning(f"Невозможно создать зеркальный ордер: ордер на границе сетки")
             return None
         
         mirror_price = grid_prices[idx_new]

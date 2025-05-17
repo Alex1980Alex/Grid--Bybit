@@ -128,6 +128,55 @@ class GridBotDB:
         self.conn.commit()
         logger.info(f"Записана сделка в БД: {order_data.get('symbol')} {order_data.get('side')} {order_data.get('price')}")
     
+    def add_trade(self, symbol: str, side: str, price: float, qty: float, order_id: str):
+        """
+        Добавляет запись о сделке в базу данных
+        
+        Args:
+            symbol: Символ торговой пары
+            side: Сторона сделки (Buy/Sell)
+            price: Цена исполнения
+            qty: Количество
+            order_id: ID ордера
+        """
+        cursor = self.conn.cursor()
+        
+        now = datetime.now().isoformat()
+        timestamp = int(datetime.now().timestamp() * 1000)
+        
+        cursor.execute('''
+            INSERT INTO fills (
+                order_id, symbol, side, price, qty, timestamp, created_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?)
+        ''', (
+            order_id,
+            symbol,
+            side,
+            price,
+            qty,
+            timestamp,
+            now
+        ))
+        
+        self.conn.commit()
+        logger.info(f"Добавлена сделка: {symbol} {side} по цене {price}")
+    
+    def get_trades(self, symbol: str) -> List[Dict[str, Any]]:
+        """
+        Получает список всех сделок для указанного символа
+        
+        Args:
+            symbol: Символ торговой пары
+            
+        Returns:
+            Список сделок
+        """
+        cursor = self.conn.cursor()
+        cursor.execute('SELECT * FROM fills WHERE symbol = ? ORDER BY timestamp DESC', (symbol,))
+        
+        rows = cursor.fetchall()
+        return [dict(row) for row in rows]
+    
     def record_active_order(self, order_data: Dict[str, Any], grid_level: Optional[int] = None):
         """
         Записывает информацию об активном ордере в базу данных
@@ -249,30 +298,72 @@ class GridBotDB:
         
         # Вычисляем среднюю цену покупки и продажи
         cursor.execute('''
-            SELECT AVG(price) as avg_buy_price 
-            FROM fills 
+            SELECT AVG(price) as avg_buy_price
+            FROM fills
             WHERE symbol = ? AND side = "Buy"
         ''', (symbol,))
         avg_buy_price = cursor.fetchone()['avg_buy_price'] or 0
         
         cursor.execute('''
-            SELECT AVG(price) as avg_sell_price 
-            FROM fills 
+            SELECT AVG(price) as avg_sell_price
+            FROM fills
             WHERE symbol = ? AND side = "Sell"
         ''', (symbol,))
         avg_sell_price = cursor.fetchone()['avg_sell_price'] or 0
         
-        # Вычисляем общую сумму комиссий
-        cursor.execute('SELECT SUM(fee) as total_fees FROM fills WHERE symbol = ?', (symbol,))
+        # Вычисляем общее количество купленных и проданных монет
+        cursor.execute('''
+            SELECT SUM(qty) as total_buy_qty
+            FROM fills
+            WHERE symbol = ? AND side = "Buy"
+        ''', (symbol,))
+        total_buy_qty = cursor.fetchone()['total_buy_qty'] or 0
+        
+        cursor.execute('''
+            SELECT SUM(qty) as total_sell_qty
+            FROM fills
+            WHERE symbol = ? AND side = "Sell"
+        ''', (symbol,))
+        total_sell_qty = cursor.fetchone()['total_sell_qty'] or 0
+        
+        # Вычисляем общую сумму потраченную на покупки и полученную от продаж
+        cursor.execute('''
+            SELECT SUM(price * qty) as total_spent
+            FROM fills
+            WHERE symbol = ? AND side = "Buy"
+        ''', (symbol,))
+        total_spent = cursor.fetchone()['total_spent'] or 0
+        
+        cursor.execute('''
+            SELECT SUM(price * qty) as total_earned
+            FROM fills
+            WHERE symbol = ? AND side = "Sell"
+        ''', (symbol,))
+        total_earned = cursor.fetchone()['total_earned'] or 0
+        
+        # Вычисляем общие комиссии
+        cursor.execute('''
+            SELECT SUM(fee) as total_fees
+            FROM fills
+            WHERE symbol = ?
+        ''', (symbol,))
         total_fees = cursor.fetchone()['total_fees'] or 0
         
+        # Вычисляем приблизительную прибыль
+        # Формула: (доход от продаж - затраты на покупки - комиссии)
+        estimated_profit = total_earned - total_spent - total_fees
+        
         return {
-            'symbol': symbol,
-            'total_fills': total_fills,
-            'buy_count': buy_count,
-            'sell_count': sell_count,
-            'avg_buy_price': avg_buy_price,
-            'avg_sell_price': avg_sell_price,
-            'total_fees': total_fees,
-            'avg_spread': avg_sell_price - avg_buy_price if avg_sell_price and avg_buy_price else 0,
+            "symbol": symbol,
+            "total_fills": total_fills,
+            "buy_count": buy_count,
+            "sell_count": sell_count,
+            "avg_buy_price": avg_buy_price,
+            "avg_sell_price": avg_sell_price,
+            "total_buy_qty": total_buy_qty,
+            "total_sell_qty": total_sell_qty,
+            "total_spent": total_spent,
+            "total_earned": total_earned,
+            "total_fees": total_fees,
+            "estimated_profit": estimated_profit
         } 
