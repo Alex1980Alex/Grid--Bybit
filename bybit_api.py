@@ -9,7 +9,7 @@ import urllib.parse
 import logging
 from typing import Dict, List, Optional, Any, Union, Tuple
 import requests
-from tenacity import retry, wait_fixed, stop_after_attempt, retry_if_exception
+from tenacity import retry, wait_fixed, stop_after_attempt, retry_if_exception, wait_exponential
 
 from config import BASE_URL, REQUEST_TIMEOUT, MAX_RETRIES, RETRY_WAIT_TIME, RETRY_ERROR_CODES, RECV_WINDOW
 
@@ -27,7 +27,15 @@ class BybitAPIError(Exception):
 
 
 def is_bybit_error_retryable(exception: Exception) -> bool:
-    """Проверяет, нужно ли повторить запрос при данной ошибке"""
+    """
+    Проверяет, нужно ли повторить запрос при данной ошибке
+    
+    Args:
+        exception: Исключение, которое нужно проверить
+        
+    Returns:
+        True, если запрос следует повторить
+    """
     if not isinstance(exception, BybitAPIError):
         return False
     
@@ -124,11 +132,28 @@ class BybitAPI:
     
     @retry(
         retry=retry_if_exception(is_bybit_error_retryable),
-        wait=wait_fixed(RETRY_WAIT_TIME),
+        wait=wait_exponential(multiplier=1, min=1, max=60),  # экспоненциальный backoff от 1 до 60 секунд
         stop=stop_after_attempt(MAX_RETRIES),
+        before_sleep=lambda retry_state: logger.warning(
+            f"Повторная попытка {retry_state.attempt_number}/{MAX_RETRIES} после ошибки. "
+            f"Ожидание {retry_state.seconds_since_start:.1f} сек."
+        )
     )
     def _request(self, method: str, endpoint: str, params: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
-        """Выполняет запрос к API с автоматическим повтором при определенных ошибках"""
+        """
+        Выполняет запрос к API с автоматическим повтором при определенных ошибках
+        
+        Args:
+            method: HTTP метод (GET, POST)
+            endpoint: Эндпоинт API
+            params: Параметры запроса
+            
+        Returns:
+            Результат запроса
+            
+        Raises:
+            BybitAPIError: при ошибке API
+        """
         url = f"{self.base_url}{endpoint}"
         
         is_post = method.lower() == "post"

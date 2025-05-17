@@ -7,6 +7,7 @@ import json
 import signal
 import asyncio
 import logging
+from logging.handlers import RotatingFileHandler
 import argparse
 from typing import Dict, List, Any, Optional
 from decimal import Decimal
@@ -20,15 +21,34 @@ from grid import build_grid, calculate_initial_orders, calculate_mirror_order, f
 from db import GridBotDB
 
 # Настройка логгера
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-    handlers=[
-        logging.StreamHandler(),
-        logging.FileHandler("grid_bot.log")
-    ]
-)
-logger = logging.getLogger("grid_bot")
+def setup_logger():
+    """Настраивает логгер с ротацией файлов"""
+    # Создаем логгер
+    logger = logging.getLogger("grid_bot")
+    logger.setLevel(logging.INFO)
+    
+    # Формат логов
+    formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+    
+    # Handler для вывода в консоль
+    console_handler = logging.StreamHandler()
+    console_handler.setFormatter(formatter)
+    logger.addHandler(console_handler)
+    
+    # Handler для записи в файл с ротацией
+    # maxBytes=5MB, backupCount=3 - максимум 3 файла по 5МБ
+    file_handler = RotatingFileHandler(
+        "grid_bot.log", 
+        maxBytes=5_000_000, 
+        backupCount=3
+    )
+    file_handler.setFormatter(formatter)
+    logger.addHandler(file_handler)
+    
+    return logger
+
+# Инициализируем логгер
+logger = setup_logger()
 
 class GridBot:
     """Класс реализации Grid-бота для торговли на споте Bybit"""

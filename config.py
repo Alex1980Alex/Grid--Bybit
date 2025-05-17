@@ -29,8 +29,18 @@ TIME_IN_FORCE = "GTC"
 # Путь к файлу базы данных SQLite
 DB_PATH = "grid_bot.db"
 
-# Коды ошибок Bybit, для которых следует повторять запрос
-RETRY_ERROR_CODES = [10006, 10016]
+# Коды ошибок Bybit, для которых следует повторить запрос
+RETRY_ERROR_CODES = [
+    10002,  # Request rate limit exceeded
+    10006,  # Too many visits, IP is limited
+    10018,  # Service is currently unavailable
+    10004,  # Internal error. Try again later.
+    -1,     # System busy, please try again later
+    -3,     # Server busy
+]
+
+# Максимальное количество уровней в сетке
+MAX_GRID_LEVELS = 50
 
 # Окно получения для API запросов (в миллисекундах)
 RECV_WINDOW = int(os.getenv("BYBIT_RECV_WINDOW", "5000"))
