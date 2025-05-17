@@ -1,0 +1,34 @@
+version: '3.8'
+
+services:
+  bot:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    environment:
+      - BYBIT_API_KEY=${BYBIT_API_KEY}
+      - BYBIT_API_SECRET=${BYBIT_API_SECRET}
+      - BYBIT_RECV_WINDOW=${BYBIT_RECV_WINDOW:-5000}
+      - SYMBOL=${SYMBOL:-BTCUSDT}
+      - LOW=${LOW:-28000}
+      - HIGH=${HIGH:-32000}
+      - GRIDS=${GRIDS:-20}
+      - QTY=${QTY:-0.001}
+      - DB_PATH=/data/grid_bot.db
+    volumes:
+      - db-data:/data
+    depends_on:
+      - db
+    restart: unless-stopped
+
+  db:
+    build:
+      context: .
+      dockerfile: Dockerfile.db
+    volumes:
+      - db-data:/data
+    restart: unless-stopped
+
+volumes:
+  db-data:
+    driver: local

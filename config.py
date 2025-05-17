@@ -27,7 +27,7 @@ RETRY_WAIT_TIME = 2
 TIME_IN_FORCE = "GTC"
 
 # Путь к файлу базы данных SQLite
-DB_PATH = "grid_bot.db"
+DB_PATH = os.getenv("DB_PATH", "grid_bot.db")
 
 # Коды ошибок Bybit, для которых следует повторить запрос
 RETRY_ERROR_CODES = [

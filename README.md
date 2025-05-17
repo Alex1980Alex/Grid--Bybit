@@ -38,10 +38,58 @@ BYBIT_API_SECRET=your_api_secret_here
 
 ## Использование
 
+### Запуск через Python
+
 Запустите бота с указанием необходимых параметров:
 
 ```bash
 python runner.py --symbol BTCUSDT --low 28000 --high 32000 --grids 20 --qty 0.001
+```
+
+### Запуск через Docker
+
+Проект также поддерживает запуск через Docker и Docker Compose:
+
+1. Убедитесь, что у вас установлены Docker и Docker Compose
+2. Создайте файл `.env` с вашими API ключами
+3. Запустите бота с помощью скрипта:
+
+```bash
+chmod +x start.sh  # Только для Linux/Mac
+./start.sh
+```
+
+или вручную с помощью команды:
+
+```bash
+docker-compose up -d
+```
+
+### Настройка Docker
+
+Вы можете настроить параметры запуска бота, изменив переменные окружения в файле `.env`:
+
+```
+BYBIT_API_KEY=your_api_key_here
+BYBIT_API_SECRET=your_api_secret_here
+BYBIT_RECV_WINDOW=5000
+SYMBOL=BTCUSDT
+LOW=28000
+HIGH=32000
+GRIDS=20
+QTY=0.001
+```
+
+### Просмотр логов
+
+```bash
+docker-compose logs -f bot
+```
+
+### Остановка бота
+
+```bash
+docker-compose down
 ```
 
 ### Параметры командной строки
@@ -60,10 +108,16 @@ python runner.py --symbol BTCUSDT --low 28000 --high 32000 --grids 20 --qty 0.00
 ├─ .env_example      # Пример файла .env
 ├─ config.py         # Константы бота
 ├─ bybit_api.py      # Обёртка над REST API V5
+├─ bybit_api_async.py # Асинхронная обёртка над REST API V5
 ├─ ws_client.py      # WebSocket клиент для событий Bybit
 ├─ grid.py           # Расчёт и перестройка сетки
 ├─ db.py             # Работа с базой данных SQLite
 ├─ runner.py         # Основной класс бота и точка входа
+├─ Dockerfile        # Файл сборки Docker образа для бота
+├─ Dockerfile.db     # Файл сборки Docker образа для БД
+├─ docker-compose.yml # Конфигурация Docker Compose
+├─ start.sh          # Скрипт для запуска через Docker
+├─ tests/            # Директория с тестами
 └─ README.md         # Документация
 ```
 
