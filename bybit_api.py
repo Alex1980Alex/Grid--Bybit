@@ -27,16 +27,19 @@ class BybitAPIError(Exception):
 
 
 def is_bybit_error_retryable(exception: Exception) -> bool:
-    """Проверяет, следует ли повторить запрос при данной ошибке"""
-    if isinstance(exception, BybitAPIError) and exception.error_code in RETRY_ERROR_CODES:
-        return True
-    return False
+    """Проверяет, нужно ли повторить запрос при данной ошибке"""
+    if not isinstance(exception, BybitAPIError):
+        return False
+    
+    # Повторяем запрос только для определенных кодов ошибок
+    return exception.error_code in RETRY_ERROR_CODES
 
 
 class BybitAPI:
     """Класс для работы с REST API Bybit V5"""
     
     def __init__(self, api_key: str, api_secret: str):
+        """Инициализирует клиент API Bybit"""
         self.api_key = api_key
         self.api_secret = api_secret
         self.base_url = BASE_URL
@@ -55,14 +58,18 @@ class BybitAPI:
         Returns:
             Строка с HMAC-SHA256 подписью
         """
-        # Сортируем параметры, чтобы гарантировать последовательный порядок
-        query = ""
-        if params:
-            # Конвертируем параметры в URL-кодированную строку запроса
-            query = urllib.parse.urlencode(sorted(params.items()))
+        # Для POST-запросов параметры должны быть отсортированы лексикографически по ключам
+        sorted_params = dict(sorted(params.items())) if params else {}
+        
+        # Для GET-запросов строка запроса строится из URL-кодированных параметров
+        # Для POST-запросов используем JSON-строку без пробелов
+        if isinstance(sorted_params, dict) and sorted_params:
+            query_string = urllib.parse.urlencode(sorted_params)
+        else:
+            query_string = ""
         
         # Формируем строку для подписи: timestamp + api_key + recv_window + query
-        sign_str = f"{timestamp}{self.api_key}{RECV_WINDOW}{query}"
+        sign_str = f"{timestamp}{self.api_key}{RECV_WINDOW}{query_string}"
         
         # Генерируем HMAC-SHA256 подпись
         signature = hmac.new(
@@ -85,15 +92,22 @@ class BybitAPI:
             Словарь заголовков
         """
         timestamp = int(time.time() * 1000)
-        signature = self._generate_signature(params if params else {}, timestamp)
+        
+        # Для POST-запросов сортируем параметры лексикографически
+        sorted_params = dict(sorted(params.items())) if params and is_post else params
+        
+        signature = self._generate_signature(sorted_params if sorted_params else {}, timestamp)
         
         headers = {
             "X-BAPI-API-KEY": self.api_key,
             "X-BAPI-TIMESTAMP": str(timestamp),
             "X-BAPI-SIGN": signature,
-            "X-BAPI-RECV-WINDOW": str(RECV_WINDOW),
-            "Content-Type": "application/json"  # Всегда ставим Content-Type: application/json
+            "X-BAPI-RECV-WINDOW": str(RECV_WINDOW)
         }
+        
+        # Для POST-запросов добавляем Content-Type: application/json
+        if is_post:
+            headers["Content-Type"] = "application/json"
         
         return headers
 
@@ -118,13 +132,22 @@ class BybitAPI:
         url = f"{self.base_url}{endpoint}"
         
         is_post = method.lower() == "post"
-        headers = self._get_headers(params, is_post)
+        params = params or {}
+        
+        # Для POST-запросов параметры должны быть отсортированы перед формированием подписи
+        sorted_params = dict(sorted(params.items())) if is_post else params
+        
+        headers = self._get_headers(sorted_params, is_post)
         
         try:
             if is_post:
-                response = requests.post(url, headers=headers, json=params, timeout=REQUEST_TIMEOUT)
+                # В POST запросе параметры отправляются как JSON в теле запроса
+                response = requests.post(url, headers=headers, json=sorted_params, timeout=REQUEST_TIMEOUT)
+                logger.debug(f"POST {endpoint} {json.dumps(sorted_params)}")
             else:
+                # В GET запросе параметры добавляются к URL
                 response = requests.get(url, headers=headers, params=params, timeout=REQUEST_TIMEOUT)
+                logger.debug(f"GET {endpoint} {params}")
             
             return self._handle_response(response)
         except requests.RequestException as e:

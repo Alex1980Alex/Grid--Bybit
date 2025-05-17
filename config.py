@@ -1,7 +1,12 @@
 """
 Конфигурационный файл с константами для Grid-бота Bybit
 """
+import os
 from typing import Dict, Any, Optional
+from dotenv import load_dotenv
+
+# Загружаем переменные окружения из .env файла
+load_dotenv()
 
 # Базовый URL для API Bybit
 BASE_URL = "https://api.bybit.com"
@@ -28,7 +33,7 @@ DB_PATH = "grid_bot.db"
 RETRY_ERROR_CODES = [10006, 10016]
 
 # Окно получения для API запросов (в миллисекундах)
-RECV_WINDOW = 5000
+RECV_WINDOW = int(os.getenv("BYBIT_RECV_WINDOW", "5000"))
 
 # Логируемые события
 LOG_EVENTS = {
