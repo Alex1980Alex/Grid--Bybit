@@ -27,6 +27,9 @@ jobs:
         if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
         pip install pytest pytest-cov ruff black mypy
     
+    - name: Verify Bybit keys
+      run: python check_api.py --env .env.example --skip-real
+    
     - name: Lint with ruff
       run: |
         ruff check .
