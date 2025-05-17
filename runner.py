@@ -15,7 +15,7 @@ from typing import List, Dict, Any, Optional
 from bybit_api import BybitAPI
 from ws_client import BybitWebsocket
 from grid import build_grid, calculate_initial_orders, calculate_mirror_order, find_grid_level
-from db import GridBotDB
+import db_writer  # Используем новый модуль вместо db
 
 # Настройка логгера
 logger = logging.getLogger("grid_bot")
@@ -77,9 +77,6 @@ class GridBot:
         
         # WebSocket-клиент для получения событий
         self.ws = None
-        
-        # База данных для хранения информации о сделках
-        self.db = GridBotDB()
         
         # Сетка цен - инициализируем только если заданы границы диапазона
         self.grid_prices = None
@@ -358,8 +355,8 @@ class GridBot:
             
             logger.info(f"Исполнен ордер {side} {qty} {self.symbol} по цене {price}")
             
-            # Сохраняем в базу данных
-            self.db.add_trade(
+            # Сохраняем в базу данных через модуль db_writer
+            db_writer.add_trade(
                 symbol=self.symbol,
                 side=side,
                 price=float(price),
@@ -446,9 +443,6 @@ class GridBot:
             else:
                 logger.info("[ТЕСТ] Отмена всех ордеров и закрытие соединений")
                 
-            # Закрываем базу данных
-            self.db.close()
-            
             logger.info("Ресурсы успешно очищены, бот завершил работу")
         
         except Exception as e:
@@ -483,7 +477,7 @@ class GridBot:
         filled_count = self.get_filled_orders_count()
         
         # Получаем статистику из БД
-        trades = self.db.get_trades(self.symbol)
+        trades = db_writer.get_trades(self.symbol)
         
         buy_volume = sum(trade["qty"] for trade in trades if trade["side"] == "Buy")
         sell_volume = sum(trade["qty"] for trade in trades if trade["side"] == "Sell")
