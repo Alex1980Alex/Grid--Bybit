@@ -111,11 +111,9 @@ class GridBot:
             # Получаем текущую цену через API или используем тестовые данные
             current_price = self._get_current_price()
             
-            # Если заданы границы диапазона, используем их,
-            # иначе определяем автоматически на основе текущей цены и волатильности
-            if self.low_price == 0 or self.high_price == 0 or self.grid_prices is None:
-                self._set_price_range_from_volatility(current_price)
-                logger.info(f"Автоматически определен диапазон цен: {self.low_price} - {self.high_price}")
+            # Всегда определяем диапазон автоматически на основе текущей цены и волатильности
+            self._set_price_range_from_volatility(current_price)
+            logger.info(f"Автоматически определен диапазон цен: {self.low_price} - {self.high_price}")
             
             # Рассчитываем начальные ордера для сетки
             buy_orders, sell_orders = calculate_initial_orders(
@@ -524,18 +522,11 @@ if __name__ == "__main__":
     # Парсинг аргументов командной строки
     parser = argparse.ArgumentParser(description='Grid-бот для торговли на Bybit')
     parser.add_argument('--symbol', required=True, help='Торговая пара (например, BTCUSDT)')
-    parser.add_argument('--low', type=float, default=0, help='Нижняя граница сетки (опционально, определяется автоматически)')
-    parser.add_argument('--high', type=float, default=0, help='Верхняя граница сетки (опционально, определяется автоматически)')
     parser.add_argument('--grids', required=True, type=int, help='Количество уровней в сетке')
     parser.add_argument('--qty', required=True, type=float, help='Количество базовой валюты для каждого ордера')
     parser.add_argument('--test', action='store_true', help='Запуск в тестовом режиме без доступа к API')
     
     args = parser.parse_args()
-    
-    # Проверка параметров
-    if args.low != 0 and args.high != 0 and args.low >= args.high:
-        logger.error("Нижняя граница должна быть меньше верхней границы")
-        sys.exit(1)
         
     if args.grids < 2:
         logger.error("Количество сеток должно быть не менее 2")
@@ -548,15 +539,15 @@ if __name__ == "__main__":
     # Инициализация и запуск бота
     bot = GridBot(
         symbol=args.symbol,
-        low_price=args.low,
-        high_price=args.high,
+        low_price=0,  # Всегда используем автоматическое определение диапазона
+        high_price=0, # Всегда используем автоматическое определение диапазона
         grid_levels=args.grids,
         qty=args.qty,
         test_mode=args.test
     )
     
     logger.info(f"Запуск Grid-бота для {args.symbol}")
-    logger.info(f"Параметры: нижняя граница={args.low}, верхняя граница={args.high}, уровней={args.grids}, количество={args.qty}")
+    logger.info(f"Параметры: уровней={args.grids}, количество={args.qty}")
     if args.test:
         logger.info("Режим: ТЕСТОВЫЙ (без доступа к API)")
     
