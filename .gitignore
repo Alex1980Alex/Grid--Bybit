@@ -1,4 +1,27 @@
+# Python кэш
 __pycache__/
+*.py[cod]
+*$py.class
+
+# Виртуальное окружение
+.venv/
+env/
+venv/
+ENV/
+
+# Файлы логов
 *.log
+*.log.*
+
+# Локальная база данных
 *.db
-.env 
+*.sqlite
+*.sqlite3
+
+# Файлы окружения
+.env
+
+# Временные файлы
+temp/
+tmp/
+.DS_Store 
